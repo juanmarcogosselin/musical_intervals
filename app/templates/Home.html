@@ -77,6 +77,23 @@
         <button onclick="alert('Ver resultados')">
             📊 Resultados
         </button>
+
+        {% load static %}
+
+        <audio id="audioDo">
+          <source src="{% static 'audios/DO.wav' %}" type="audio/wav">
+        </audio>
+        
+        <button onclick="playDo()">Reproducir</button>
+        
+        <script>
+        function playDo() {
+          const audio = document.getElementById("audioDo");
+          audio.currentTime = 0;
+          audio.play();
+        }
+        </script>
+        
     </div>
 </main>
 
