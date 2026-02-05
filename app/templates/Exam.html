@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Examen de Intervalos</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background: #1f2933;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        main {
+            max-width: 900px;
+            margin: 2rem auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+        }
+
+        .audio-controls {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .interval-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        button {
+            padding: 0.8rem;
+            font-size: 1rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .interval-btn {
+            background: #e5e7eb;
+        }
+
+        .interval-btn:hover {
+            background: #d1d5db;
+        }
+
+        .primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        footer {
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h2>Examen de Intervalos</h2>
+    <a href="{% url 'home' %}" style="color:white; text-decoration:none;">
+        ⬅ Volver a Home
+    </a>
+</header>
+
+<main>
+
+    <p><strong>Pregunta {{ question_number }} de {{ total_questions }}</strong></p>
+
+    <!-- AUDIO -->
+    <div class="audio-controls">
+        <audio id="interval-audio" src="{{ audio_url }}"></audio>
+
+        <button class="primary" onclick="playAudio()">
+            ▶ Reproducir
+        </button>
+
+        <button class="secondary" onclick="playAudio()">
+            🔁 Repetir
+        </button>
+    </div>
+
+    <!-- FORM -->
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="interval-grid">
+            {% for interval in intervals %}
+                <button
+                    type="submit"
+                    name="answer"
+                    value="{{ interval.id }}"
+                    class="interval-btn">
+                    {{ interval.name }}
+                </button>
+            {% endfor %}
+        </div>
+    </form>
+
+    <footer>
+        <a href="{% url 'home' %}">
+            ← Salir del examen
+        </a>
+
+        <form method="post">
+            {% csrf_token %}
+            <button name="skip" value="true" class="secondary">
+                Siguiente →
+            </button>
+        </form>
+    </footer>
+
+</main>
+
+<script>
+    function playAudio() {
+        const audio = document.getElementById("interval-audio");
+        audio.currentTime = 0;
+        audio.play();
+    }
+
+    // autoplay opcional
+    window.onload = () => playAudio();
+</script>
+
+</body>
+</html>
