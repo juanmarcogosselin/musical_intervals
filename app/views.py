@@ -12,14 +12,33 @@ def settings(request):
     return render(request, "settings.html")
 
 def exam(request): 
+    intervals = Interval.objects.all().order_by("semitones")
 
-    semitones = random.randint(1,12)
+#correcto/incorrecto
+    feedback = None
+    #si hubo una peticion con el metodo POST (post es un diccionario) y hay contenido del tipo "answer"
+    if request.method == "POST" and "answer" in request.POST: 
+        answer_id = int(request.POST["answer"])
+        correct_id = int(request.POST["correct_interval_id"])
+        if answer_id == correct_id: 
+            feedback = "Correcto"
+        else: 
+            correct_name = Interval.objects.get(id = correct_id).name
+            feedback = f"Incorrecto. {correct_name}"
+        
+    interval = random.choice(list(Interval.objects.all()))
+    nota1 = random.choice(list(Note.objects.exclude(audio_file__isnull=True)))   
 
-    correct_interval = Interval.objects.get(semitones = semitones)
-    intervals = Interval.objects.all().order_by('semitones')
+    pitch2 = (nota1.pitch_class + interval.semitones) % 12
+    nota2 = Note.objects.get(pitch_class = pitch2)
 
-    return render(request, "Exam.html", { 
-        "intervals": intervals,
-        "correct_interval": correct_interval.id, 
-    })
+    context = {
+        "nota1_audio": nota1.audio_file.url, 
+        "nota2_audio": nota2.audio_file.url,
+        "intervals" : intervals,
+        "feedback" : feedback,
 
+        "correct_interval_id" : interval.id, 
+    }
+
+    return render(request, "Exam.html", context)

@@ -70,6 +70,19 @@
         footer {
             display: flex;
             justify-content: space-between;
+            align-items: center;
+        }
+
+        .feedback {
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 1rem 0;
+        }
+
+        .score-box {
+            text-align: center;
+            margin-bottom: 1rem;
         }
     </style>
 </head>
@@ -85,24 +98,35 @@
 
 <main>
 
-    <p><strong>Pregunta {{ question_number }} de {{ total_questions }}</strong></p>
+    {% if feedback %}
+        <div class="feedback">
+            {{ feedback }}
 
-    <!-- AUDIO -->
+        </div>
+    {% endif %}
+
+    <!-- AUDIO (2 audios) -->
     <div class="audio-controls">
-        <audio id="interval-audio" src="{{ audio_url }}"></audio>
 
-        <button class="primary" onclick="playAudio()">
+        <audio id="audio1" src="{{ nota1_audio }}"></audio>
+        <audio id="audio2" src="{{ nota2_audio }}"></audio>
+
+
+
+        <button class="primary" onclick="playInterval()" type="button">
             ▶ Reproducir
         </button>
 
-        <button class="secondary" onclick="playAudio()">
+        <button class="secondary" onclick="playInterval()" type="button">
             🔁 Repetir
         </button>
     </div>
 
-    <!-- FORM -->
+    <!-- FORM: contestar -->
     <form method="post">
         {% csrf_token %}
+
+        <input type="hidden" name="correct_interval_id" value="{{ correct_interval_id }}">
 
         <div class="interval-grid">
             {% for interval in intervals %}
@@ -117,30 +141,28 @@
         </div>
     </form>
 
-    <footer>
-        <a href="{% url 'home' %}">
-            ← Salir del examen
-        </a>
-
-        <form method="post">
-            {% csrf_token %}
-            <button name="skip" value="true" class="secondary">
-                Siguiente →
-            </button>
-        </form>
-    </footer>
-
 </main>
 
-<script>
-    function playAudio() {
-        const audio = document.getElementById("interval-audio");
-        audio.currentTime = 0;
-        audio.play();
-    }
 
-    // autoplay opcional
-    window.onload = () => playAudio();
+<script>
+    function playInterval() {
+        const a1 = document.getElementById("audio1");
+        const a2 = document.getElementById("audio2");
+
+        // reiniciar
+        a1.pause();
+        a2.pause();
+        a1.currentTime = 0;
+        a2.currentTime = 0;
+
+        // reproducir nota 1
+        a1.play();
+
+        // 1.5 segundos después, nota 2 (se enciman)
+        setTimeout(() => {
+            a2.play();
+        }, 1300);
+    }
 </script>
 
 </body>
