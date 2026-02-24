@@ -1,169 +1,218 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <link rel="stylesheet" href="{% static 'css/Exam.css' %}">
     <title>Examen de Intervalos</title>
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            margin: 0;
-            padding: 0;
-        }
-
-        header {
-            background: #1f2933;
-            color: white;
-            padding: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        main {
-            max-width: 900px;
-            margin: 2rem auto;
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-        }
-
-        .audio-controls {
-            text-align: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .interval-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        button {
-            padding: 0.8rem;
-            font-size: 1rem;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-        }
-
-        .interval-btn {
-            background: #e5e7eb;
-        }
-
-        .interval-btn:hover {
-            background: #d1d5db;
-        }
-
-        .primary {
-            background: #2563eb;
-            color: white;
-        }
-
-        .secondary {
-            background: #6b7280;
-            color: white;
-        }
-
-        footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .feedback {
-            text-align: center;
-            font-size: 1.2rem;
-            font-weight: bold;
-            margin: 1rem 0;
-        }
-
-        .score-box {
-            text-align: center;
-            margin-bottom: 1rem;
-        }
-    </style>
 </head>
 
 <body>
-
 <header>
-    <h2>Examen de Intervalos</h2>
-    <a href="{% url 'home' %}" style="color:white; text-decoration:none;">
-        ⬅ Volver a Home
-    </a>
+<h1>Identificar Intervalo</h1>
 </header>
-
 <main>
 
-    {% if feedback %}
-        <div class="feedback">
-            {{ feedback }}
+<button type="button" onclick="playInterval()" class="primary">
+    ▶ Reproducir Intervalo
+</button>
 
-        </div>
-    {% endif %}
+<button type="button" onclick="playPrevious()" class="secondary" id="btn-previous" disabled>
+    ↩ Repetir 
+</button>
 
-    <!-- AUDIO (2 audios) -->
-    <div class="audio-controls">
+{% if feedback %}
+    <p><strong>{{ feedback }}</strong></p>
+{% endif %}
 
-        <audio id="audio1" src="{{ nota1_audio }}"></audio>
-        <audio id="audio2" src="{{ nota2_audio }}"></audio>
+<form method="POST">
+    {% csrf_token %}
+    <input type="hidden" name="correct_interval_id" value="{{ correct_interval_id }}">
+    <input type="hidden" id="root_midi"   name="root_midi"   value="{{ root_midi }}">
+    <input type="hidden" id="second_midi" name="second_midi" value="{{ second_midi }}">
+    <input type="hidden" id="prev_root"   value="{{ prev_root }}">
+    <input type="hidden" id="prev_second" value="{{ prev_second }}">
 
+    <hr style="margin: 10px;">
 
-
-        <button class="primary" onclick="playInterval()" type="button">
-            ▶ Reproducir
-        </button>
-
-        <button class="secondary" onclick="playInterval()" type="button">
-            🔁 Repetir
-        </button>
+    <div class="interval-grid">
+        {% for interval in intervals %}
+            <button
+                type="submit"
+                name="answer"
+                value="{{ interval.id }}"
+                class="interval-btn">
+                {{ interval.name }}
+            </button>
+        {% endfor %}
     </div>
+</form>
 
-    <!-- FORM: contestar -->
-    <form method="post">
-        {% csrf_token %}
-
-        <input type="hidden" name="correct_interval_id" value="{{ correct_interval_id }}">
-
-        <div class="interval-grid">
-            {% for interval in intervals %}
-                <button
-                    type="submit"
-                    name="answer"
-                    value="{{ interval.id }}"
-                    class="interval-btn">
-                    {{ interval.name }}
-                </button>
-            {% endfor %}
-        </div>
-    </form>
-
-</main>
-
+<div id="audio-config"
+     data-sfz-url="{% static 'soundfonts/SalamanderGrandPianoV3Retuned.sfz' %}"
+     data-samples-base="{% static 'soundfonts/' %}"
+     style="display:none">
+</div>
 
 <script>
-    function playInterval() {
-        const a1 = document.getElementById("audio1");
-        const a2 = document.getElementById("audio2");
+// ============================================================
+// CONFIGURACIÓN
+// ============================================================
+const config     = document.getElementById('audio-config');
+const SFZ_URL    = config.dataset.sfzUrl;
+const SAMPLES_BASE = config.dataset.samplesBase;
 
-        // reiniciar
-        a1.pause();
-        a2.pause();
-        a1.currentTime = 0;
-        a2.currentTime = 0;
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-        // reproducir nota 1
-        a1.play();
+let sfzRegions  = [];
+let audioBuffers = {};
 
-        // 1.5 segundos después, nota 2 (se enciman)
-        setTimeout(() => {
-            a2.play();
-        }, 1300);
+// Variables del intervalo anterior — se llenan en DOMContentLoaded
+let previousRoot   = null;
+let previousSecond = null;
+
+// ============================================================
+// CARGAR Y PARSEAR EL SFZ
+// ============================================================
+async function loadSFZ() {
+    const response = await fetch(SFZ_URL);
+    const text     = await response.text();
+    sfzRegions     = parseSFZ(text);
+    console.log(`SFZ cargado: ${sfzRegions.length} regiones encontradas`);
+}
+
+function parseSFZ(text) {
+    const regions      = [];
+    const regionBlocks = text.split(/<region>/i).slice(1);
+
+    for (const block of regionBlocks) {
+        const content = block.split(/<(?!\/)/)[0];
+        const region  = {};
+
+        const sampleMatch = content.match(/sample\s*=\s*([^\s\r\n]+)/i);
+        if (sampleMatch) region.sample = sampleMatch[1].replace(/\\/g, '/');
+
+        const lokeyMatch = content.match(/lokey\s*=\s*(\d+)/i);
+        if (lokeyMatch) region.lokey = parseInt(lokeyMatch[1]);
+
+        const hikeyMatch = content.match(/hikey\s*=\s*(\d+)/i);
+        if (hikeyMatch) region.hikey = parseInt(hikeyMatch[1]);
+
+        const pitchMatch = content.match(/pitch_keycenter\s*=\s*(\d+)/i);
+        if (pitchMatch) region.pitch_keycenter = parseInt(pitchMatch[1]);
+
+        const lovelMatch = content.match(/lovel\s*=\s*(\d+)/i);
+        if (lovelMatch) region.lovel = parseInt(lovelMatch[1]);
+
+        const hivelMatch = content.match(/hivel\s*=\s*(\d+)/i);
+        if (hivelMatch) region.hivel = parseInt(hivelMatch[1]);
+
+        if (region.sample && region.lokey !== undefined && region.hikey !== undefined) {
+            if (region.pitch_keycenter === undefined) region.pitch_keycenter = region.lokey;
+            regions.push(region);
+        }
     }
-</script>
+    return regions;
+}
 
+// ============================================================
+// BUSCAR REGIÓN SFZ PARA UNA NOTA MIDI
+// ============================================================
+function findRegion(midiNote, velocity = 80) {
+    for (const region of sfzRegions) {
+        const inKeyRange = midiNote >= region.lokey && midiNote <= region.hikey;
+        const inVelRange = velocity >= (region.lovel ?? 0) && velocity <= (region.hivel ?? 127);
+        if (inKeyRange && inVelRange) return region;
+    }
+    return null;
+}
+
+// ============================================================
+// CARGAR WAV EN MEMORIA (CON CACHÉ)
+// ============================================================
+async function loadAudioBuffer(samplePath) {
+    if (audioBuffers[samplePath]) return audioBuffers[samplePath];
+
+    const safePath  = samplePath.replace(/#/g, '%23');
+    const url       = SAMPLES_BASE + safePath;
+    const response  = await fetch(url);
+    const arrayBuf  = await response.arrayBuffer();
+    const audioBuf  = await audioCtx.decodeAudioData(arrayBuf);
+    audioBuffers[samplePath] = audioBuf;
+    return audioBuf;
+}
+
+// ============================================================
+// REPRODUCIR UNA NOTA MIDI
+// ============================================================
+async function playNote(midiNote, startTime, duration = 2.0) {
+    const region = findRegion(midiNote);
+    if (!region) {
+        console.warn(`No se encontró región para nota MIDI ${midiNote}`);
+        return;
+    }
+    const buffer = await loadAudioBuffer(region.sample);
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    const semitonesDiff = midiNote - region.pitch_keycenter;
+    source.playbackRate.value = Math.pow(2, semitonesDiff / 12);
+    source.connect(audioCtx.destination);
+    source.start(startTime);
+    source.stop(startTime + duration);
+}
+
+// ============================================================
+// REPRODUCIR EL INTERVALO ACTUAL
+// ============================================================
+async function playInterval() {
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    const rootMidi   = parseInt(document.getElementById('root_midi').value);
+    const secondMidi = parseInt(document.getElementById('second_midi').value);
+
+    // Guardamos como "anterior" para poder repetirlo después de contestar
+    previousRoot   = rootMidi;
+    previousSecond = secondMidi;
+    document.getElementById('btn-previous').disabled = false;
+
+    const now = audioCtx.currentTime;
+    await playNote(rootMidi,   now,       1.5);
+    await playNote(secondMidi, now + 1.2, 1.5);
+}
+
+// ============================================================
+// REPETIR EL INTERVALO ANTERIOR
+// ============================================================
+async function playPrevious() {
+    if (previousRoot === null) return;
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    const now = audioCtx.currentTime;
+    await playNote(previousRoot,   now,       1.5);
+    await playNote(previousSecond, now + 1.2, 1.5);
+}
+
+// ============================================================
+// INICIALIZACIÓN — esperar a que el DOM y el SFZ estén listos
+// ============================================================
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log("Cargando SFZ...");
+    await loadSFZ();
+    console.log("Listo para reproducir");
+
+    // Leer el intervalo anterior que Django guardó en los campos hidden
+    const prevRootVal   = document.getElementById('prev_root').value;
+    const prevSecondVal = document.getElementById('prev_second').value;
+
+    // Solo habilitamos el botón si hay valores reales (no vacío ni "None")
+    if (prevRootVal && prevRootVal !== 'None' && prevSecondVal && prevSecondVal !== 'None') {
+        previousRoot   = parseInt(prevRootVal);
+        previousSecond = parseInt(prevSecondVal);
+        document.getElementById('btn-previous').disabled = false;
+        console.log("Intervalo anterior listo:", previousRoot, "→", previousSecond);
+    }
+});
+</script>
+</main>
 </body>
 </html>

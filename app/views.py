@@ -1,8 +1,7 @@
 import random
 from django.shortcuts import render
 from django.http import HttpResponse
-from .models import Interval, Note
-
+from .models import Interval
 # Create your views here.
 def home(request): 
     return render(request, "Home.html")
@@ -16,6 +15,11 @@ def exam(request):
 
 #correcto/incorrecto
     feedback = None
+
+    # intervalo anterior para el boton de repetir
+    prev_root = None
+    prev_second = None
+
     #si hubo una peticion con el metodo POST (post es un diccionario) y hay contenido del tipo "answer"
     if request.method == "POST" and "answer" in request.POST: 
         answer_id = int(request.POST["answer"])
@@ -25,19 +29,25 @@ def exam(request):
         else: 
             correct_name = Interval.objects.get(id = correct_id).name
             feedback = f"Incorrecto. {correct_name}"
+            
+        prev_root = request.POST.get("root_midi")
+        prev_second = request.POST.get("second_midi")
+    
         
-    interval = random.choice(list(Interval.objects.all()))
-    nota1 = random.choice(list(Note.objects.exclude(audio_file__isnull=True)))   
+    interval = random.choice(list(intervals))
 
-    pitch2 = (nota1.pitch_class + interval.semitones) % 12
-    nota2 = Note.objects.get(pitch_class = pitch2)
+    root_midi = random.randint(48, 72)
+    
+    second_midi = root_midi + interval.semitones
+
 
     context = {
-        "nota1_audio": nota1.audio_file.url, 
-        "nota2_audio": nota2.audio_file.url,
+        "root_midi": root_midi,
+        "second_midi": second_midi, 
         "intervals" : intervals,
         "feedback" : feedback,
-
+        "prev_root": prev_root,       
+        "prev_second": prev_second,
         "correct_interval_id" : interval.id, 
     }
 
