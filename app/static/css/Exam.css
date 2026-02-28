@@ -6,9 +6,9 @@ body {
 }
 
 header {
-    background: #1f2933;
+    background-color: #222;
     color: white;
-    padding: 1rem;
+    padding: 15px 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -77,4 +77,13 @@ footer {
 .score-box {
     text-align: center;
     margin-bottom: 1rem;
+}
+nav a {
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: bold;
+    padding: 20px;
+}
+header nav a:hover {
+    opacity: 0.8;
 }

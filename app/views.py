@@ -1,5 +1,5 @@
 import random
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from .models import Interval
 # Create your views here.
@@ -8,10 +8,22 @@ def home(request):
 
 
 def settings(request): 
-    return render(request, "settings.html")
+    if request.method == 'POST':
+        num = request.POST.get('questions')
+        request.session['num_questions']= int(num) if num != '' else 10
+        request.session['direction'] = request.POST.get('direction', 'ascending')
+        return redirect('exam')
+    
+    context = {
+        'num_questions': request.session.get('num_questions', 10),
+        'direction': request.session.get('direction', 'ascending')
+    }
+    return render(request, "settings.html", context)
 
 def exam(request): 
     intervals = Interval.objects.all().order_by("semitones")
+
+    direction = request.session.get('direction', 'ascending')
 
 #correcto/incorrecto
     feedback = None
@@ -29,16 +41,27 @@ def exam(request):
         else: 
             correct_name = Interval.objects.get(id = correct_id).name
             feedback = f"Incorrecto. {correct_name}"
-            
+
         prev_root = request.POST.get("root_midi")
         prev_second = request.POST.get("second_midi")
     
         
     interval = random.choice(list(intervals))
-
     root_midi = random.randint(48, 72)
+
+    direction = request.session.get('direction', 'ascending')
+    print("DIRECTION DESDE SESIÓN:", direction)
     
-    second_midi = root_midi + interval.semitones
+    if direction == 'mixed':
+        actual_direction = random.choice(['ascending', 'descending', 'harmonic'])
+    else: 
+        actual_direction = direction
+
+    if actual_direction == 'descending':
+        second_midi = root_midi - interval.semitones
+    else:
+        second_midi = root_midi + interval.semitones
+ 
 
 
     context = {
@@ -49,6 +72,7 @@ def exam(request):
         "prev_root": prev_root,       
         "prev_second": prev_second,
         "correct_interval_id" : interval.id, 
+        "direction" : actual_direction, 
     }
 
     return render(request, "Exam.html", context)

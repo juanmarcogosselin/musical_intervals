@@ -12,5 +12,13 @@ class Note(models.Model):
 
 
 class config(models.Model): 
-    num_preguntas = models.IntegerField()
-    direccion = models.CharField(max_length = 1, null = False)
+    num_question = models.IntegerField()
+    direction = models.CharField(max_length = 10, null = False)
+
+
+class stats(models.Model): 
+    num_questions = models.IntegerField()
+    correct = models.IntegerField
+    precision = models.FloatField()
+    precision_interval = models.FloatField()
+
